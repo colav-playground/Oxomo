@@ -59,31 +59,37 @@ class OxomoCheckPoint:
         
         self.client[mongo_db][f"{mongo_collection}_identity"].drop()
         self.client[mongo_db][f"{mongo_collection}_identity"].insert_one(info)
-        
-        if not self.exists_records(mongo_db, mongo_collection):
-            ids = client.listIdentifiers(metadataPrefix=metadataPrefix)
-            identifiers=[]
+            
+        if self.exists_records(mongo_db, mongo_collection):
             print(f"=== Getting Records ids from {base_url}  for {mongo_collection}")
-            #for i in tqdm(ids):
-            counter=0
-            for i in ids:
+            print(f"=== Calling incremental checkpoints")
+            old_ids = list(self.client[mongo_db][f"{mongo_collection}_identifiers"].find({},{'_ids':1}))
+            old_ids = [i["_id"] for i in old_ids]
+        else:
+            old_ids=[]
+            print(f"=== Getting Records ids from {base_url}  for {mongo_collection}")
+            
+        ids = client.listIdentifiers(metadataPrefix=metadataPrefix)
+        identifiers=[]
+        counter=0
+        for i in ids:
+            _id = i.identifier()
+            if _id not in old_ids:
                 identifier = {}
-                identifier["_id"] = i.identifier()
+                identifier["_id"] = _id
                 identifier["datestamp"] = i.datestamp()
                 identifier["deleted"] = i.isDeleted()
                 identifier["setspec"] = i.setSpec()
-                identifier["downloaded"] = 0
+                identifier["downloaded"] = False
                 identifiers.append(identifier)
-                counter+=1
-                if counter%1000 == 0:
-                    print(f"CheckPoint: Processed {counter} records for {mongo_collection}")
-            identifiers = list({ item['_id'] : item for item in identifiers}.values())
+            counter+=1
+            if counter%1000 == 0:
+                print(f"CheckPoint: Processed {counter} records for {mongo_collection}")
+        identifiers = list({ item['_id'] : item for item in identifiers}.values())
+        if len(identifiers)>0:
             self.client[mongo_db][f"{mongo_collection}_identifiers"].insert_many(identifiers)
-            print("=== Records CheckPoint total records found = {} for {}".format(len(identifiers),f"{mongo_collection}_identifiers"))
-        else:
-            print(f"=== WARNING: records checkpoint for {mongo_collection}_identifiers already exists.")
-            print(f"=== WARNING: Incremental checkpoint is not implemented yet, omitting..")
-        
+        print("=== Records CheckPoint total records found = {} for {}".format(len(identifiers),f"{mongo_collection}_identifiers"))
+            
     def exists_records(self, mongo_db: str, mongo_collection: str):
         """
         Method to check if the checkpoints already exists for records.
