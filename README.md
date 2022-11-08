@@ -1,2 +1,2 @@
 # Oxomo
-Colav D Space Harvesting / Goddess of the night, the astrology and the calendar.
+Colav OAI-PMH Harvesting / Goddess of the night, the astrology and the calendar.
