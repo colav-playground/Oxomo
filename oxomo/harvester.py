@@ -4,6 +4,7 @@ from oaipmh.client import Client
 from joblib import Parallel, delayed
 import psutil
 import xmltodict
+from ratelimit import limits, sleep_and_retry
 
 class OxomoHarvester:
     """
@@ -24,8 +25,22 @@ class OxomoHarvester:
         self.endpoints = endpoints
         self.mongo_db = mongo_db
         self.client = MongoClient(mongodb_uri)
-    
-    def process_record(self,client:Client,identifier:str,metadataPrefix:str, mongo_collection:str):
+        self.check_limit = {}
+        for endpoint in self.endpoints.keys():
+            if "rate_limit" in  self.endpoints[endpoint].keys():
+                calls=self.endpoints[endpoint]["rate_limit"]["calls"]
+                secs=self.endpoints[endpoint]["rate_limit"]["secs"]
+                @sleep_and_retry
+                @limits(calls=calls, period=secs)
+                def check_limit():
+                    pass
+                self.check_limit[endpoint] = check_limit
+            else:
+                def check_limit():
+                    pass
+                self.check_limit[endpoint] = check_limit
+        
+    def process_record(self,client:Client,identifier:str,metadataPrefix:str, mongo_collection:str,endpoint:str):
         """
         This method perform the request for the given record id and save it in the mongo
         collection and updates the checkpoint collection when it was inserted.
@@ -43,6 +58,8 @@ class OxomoHarvester:
         mongo_collection:str
             MongoDb collection name
         """
+        self.check_limit[endpoint]()
+        
         try:
             raw_record = client.makeRequest(**{'verb': 'GetRecord', 'identifier': identifier, 'metadataPrefix': metadataPrefix})
         except Exception as e:
@@ -70,9 +87,9 @@ class OxomoHarvester:
                 self.ckp.update_record(self.mongo_db, mongo_collection,keys={"_id":identifier})
 
 
-    def process_records(self,client:Client,identifiers:list, metadataPrefix:str, mongo_collection:str):
+    def process_records(self,client:Client,identifiers:list, metadataPrefix:str, mongo_collection:str,endpoint:str):
         for identifier in identifiers:
-            self.process_record(client,identifier["_id"], metadataPrefix, mongo_collection)
+            self.process_record(client,identifier["_id"], metadataPrefix, mongo_collection,endpoint)
     
     def process_endpoint(self,endpoint:str):
         url = self.endpoints[endpoint]["url"]
@@ -81,7 +98,7 @@ class OxomoHarvester:
         if self.ckp.exists_records(self.mongo_db, mongo_collection):
             client = Client(url)
             record_ids = self.ckp.get_records_regs(self.mongo_db,mongo_collection)
-            self.process_records(client,record_ids,self.endpoints[endpoint]["metadataPrefix"],mongo_collection)
+            self.process_records(client,record_ids,self.endpoints[endpoint]["metadataPrefix"],mongo_collection,endpoint)
         else:
             print(f"*** Error: records checkpoint for {url} not found, create it first with ...")
             print(f"*** Omitting records {url} {mongo_collection}")
