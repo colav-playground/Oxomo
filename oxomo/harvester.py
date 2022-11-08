@@ -88,8 +88,13 @@ class OxomoHarvester:
 
 
     def process_records(self,client:Client,identifiers:list, metadataPrefix:str, mongo_collection:str,endpoint:str):
+        count = 0
+        size = len(identifiers)
         for identifier in identifiers:
             self.process_record(client,identifier["_id"], metadataPrefix, mongo_collection,endpoint)
+            if count%1000 == 0:
+                print(f"INFO: Downloaded {count} of {size} ({(count/size)*100:.2f}%) for {endpoint}")
+            count+=1
     
     def process_endpoint(self,endpoint:str):
         url = self.endpoints[endpoint]["url"]
