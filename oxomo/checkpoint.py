@@ -1,9 +1,8 @@
 from joblib import Parallel, delayed
 from oaipmh.client import Client
 from pymongo import MongoClient
-import importlib
 import psutil
-import sys
+
 
 class OxomoCheckPoint:
     """
@@ -156,7 +155,7 @@ class OxomoCheckPoint:
             ids of records not downloaded.
         """
         ckp_col = self.client[mongo_db][f"{mongo_collection}_identifiers"]        
-        ckpdata = list(ckp_col.find({"$and":[ {"downloaded": 0}, {"deleted":False}]}, {"downloaded": 0}))
+        ckpdata = list(ckp_col.find({"$and":[ {"downloaded": False}, {"deleted":False}]}, {"downloaded": 0}))
         return ckpdata
     
     def run(self,endpoints:dict, mongo_db: str,jobs:int=None):
