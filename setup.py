@@ -82,7 +82,7 @@ def main():
         install_requires=[
             'xmltodict>=0.13.0',
             'pyoai>=2.5.0',
-            'ratelimit>=2.2.1'
+            'ratelimit>=2.2.1',
             'psutil',
             'pymongo>=3.12.0',
             'joblib>=1.1.0'

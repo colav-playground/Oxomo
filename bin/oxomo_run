@@ -2,21 +2,21 @@
 from oxomo.checkpoint import OxomoCheckPoint
 from oxomo.harvester import OxomoHarvester
 
-import psutil
-import json
+#import json
 import sys
 import argparse
+import importlib
 import faulthandler
 faulthandler.enable()
 
 parser = argparse.ArgumentParser(description='Oxomo Harvester')
-parser.add_argument('--max_threads', type=int, default=-1,
+parser.add_argument('--max_threads', type=int, default=None,
                     help='an integer for number of threads, default -1 meaning all available')
 parser.add_argument('--mongo_dburi', type=str,
                     default='mongodb://localhost:27017/', help='uri for MongoDb database')
 parser.add_argument('--mongo_dbname', type=str,
                     default="oxomo", help='MongoDb name to save the data.')
-parser.add_argument('--config', type=str,required=True, help='json config file, take a look in the README for more information.')
+parser.add_argument('--config', type=str,required=True, help='python file with a dictionary called endpoints, take a look in the README for more information.')
 parser.add_argument('--drop_mongodb', action='store_true',
                     help='delete the database, use it with carefull, deletes everything!')
 parser.add_argument('--checkpoint', action='store_true',
@@ -45,11 +45,14 @@ def check_endpoints(endpoints):
 if __name__ == '__main__':
     args = parser.parse_args()
     max_threads = args.max_threads
-    if max_threads is -1:
-        max_threads = psutil.cpu_count()
     config_file = args.config
-    with open(config_file) as f:
-        endpoints = json.load(f)
+    #with open(config_file) as f:
+    #    endpoints = json.load(f)
+    loader = importlib.machinery.SourceFileLoader('config', config_file)
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    config = importlib.util.module_from_spec(spec)
+    loader.exec_module(config)
+    endpoints= config.endpoints
     if check_endpoints(endpoints) == False:
         print(f"ERROR: config file {config_file} error, fix the configuration to continue, please take a look in the README.md to get some help.")
         print(f"ERROR: aborting execution")

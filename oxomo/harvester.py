@@ -105,7 +105,7 @@ class OxomoHarvester:
             record_ids = self.ckp.get_records_regs(self.mongo_db,mongo_collection)
             self.process_records(client,record_ids,self.endpoints[endpoint]["metadataPrefix"],mongo_collection,endpoint)
         else:
-            print(f"*** Error: records checkpoint for {url} not found, create it first with ...")
+            print(f"*** Error: records checkpoint for {endpoint} not found, create it first with ...")
             print(f"*** Omitting records {url} {mongo_collection}")
             
     def run(self,jobs=None):
