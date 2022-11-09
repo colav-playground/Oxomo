@@ -57,8 +57,8 @@ if __name__ == '__main__':
         print(f"ERROR: config file {config_file} error, fix the configuration to continue, please take a look in the README.md to get some help.")
         print(f"ERROR: aborting execution")
         sys.exit(1)
-    if args.checkpoint:
-        ckp = OxomoCheckPoint(mongodb_uri=args.mongo_dburi)
-        ckp.run(endpoints,args.mongo_dbname,max_threads)
+    #if args.checkpoint:
+    #    ckp = OxomoCheckPoint(mongodb_uri=args.mongo_dburi)
+    #    ckp.run(endpoints,args.mongo_dbname,max_threads)
     harvester = OxomoHarvester(endpoints,args.mongo_dbname,args.mongo_dburi)
-    harvester.run(max_threads)
+    harvester.run(args.checkpoint, max_threads)

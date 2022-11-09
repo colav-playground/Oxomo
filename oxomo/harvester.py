@@ -96,9 +96,12 @@ class OxomoHarvester:
                 print(f"INFO: Downloaded {count} of {size} ({(count/size)*100:.2f}%) for {endpoint}")
             count+=1
     
-    def process_endpoint(self,endpoint:str):
+    def process_endpoint(self,endpoint:str,checkpoint:bool):
         url = self.endpoints[endpoint]["url"]
+        metadataPrefix = self.endpoints[endpoint]["metadataPrefix"]
         mongo_collection = endpoint
+        if checkpoint:
+            self.ckp.create(url,self.mongo_db,mongo_collection,metadataPrefix)
         print(f"\n=== Processing {mongo_collection} from {url} ")
         if self.ckp.exists_records(self.mongo_db, mongo_collection):
             client = Client(url)
@@ -108,7 +111,7 @@ class OxomoHarvester:
             print(f"*** Error: records checkpoint for {endpoint} not found, create it first with ...")
             print(f"*** Omitting records {url} {mongo_collection}")
             
-    def run(self,jobs=None):
+    def run(self,checkpoint:bool=False,jobs:int=None):
         """
         Method to start the harvesting of the data in the multiples endpoints in parallel.
         You have to create the checkpoint first, before call this method.
@@ -122,4 +125,4 @@ class OxomoHarvester:
         if jobs is None:
             jobs = psutil.cpu_count()
         Parallel(n_jobs=jobs, backend='threading', verbose=10)(delayed(self.process_endpoint)(
-                endpoint) for endpoint in self.endpoints.keys())
+                endpoint,checkpoint) for endpoint in self.endpoints.keys())
