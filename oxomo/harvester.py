@@ -6,6 +6,7 @@ import psutil
 import xmltodict
 from ratelimit import limits, sleep_and_retry
 
+
 class OxomoHarvester:
     """
     Class for harvesting data from OAI-PHM protocol
@@ -102,11 +103,12 @@ class OxomoHarvester:
         mongo_collection = endpoint
         if checkpoint:
             self.ckp.create(url,self.mongo_db,mongo_collection,metadataPrefix)
+            
         print(f"\n=== Processing {mongo_collection} from {url} ")
         if self.ckp.exists_records(self.mongo_db, mongo_collection):
             client = Client(url)
             record_ids = self.ckp.get_records_regs(self.mongo_db,mongo_collection)
-            self.process_records(client,record_ids,self.endpoints[endpoint]["metadataPrefix"],mongo_collection,endpoint)
+            self.process_records(client,record_ids,metadataPrefix,mongo_collection,endpoint)
         else:
             print(f"*** Error: records checkpoint for {endpoint} not found, create it first with ...")
             print(f"*** Omitting records {url} {mongo_collection}")
@@ -124,5 +126,7 @@ class OxomoHarvester:
         """
         if jobs is None:
             jobs = psutil.cpu_count()
+        if jobs > len(self.endpoints.keys()):
+            jobs = len(self.endpoints.keys())
         Parallel(n_jobs=jobs, backend='threading', verbose=10)(delayed(self.process_endpoint)(
                 endpoint,checkpoint) for endpoint in self.endpoints.keys())
