@@ -5,7 +5,7 @@ from joblib import Parallel, delayed
 import psutil
 import xmltodict
 from ratelimit import limits, sleep_and_retry
-
+import urllib.parse
 
 class OxomoHarvester:
     """
@@ -62,7 +62,7 @@ class OxomoHarvester:
         self.check_limit[endpoint]()
         
         try:
-            raw_record = client.makeRequest(**{'verb': 'GetRecord', 'identifier': identifier, 'metadataPrefix': metadataPrefix})
+            raw_record = client.makeRequest(**{'verb': 'GetRecord', 'identifier': urllib.parse.quote(identifier), 'metadataPrefix': metadataPrefix})
         except Exception as e:
             record={}
             record["identifier"]=identifier
