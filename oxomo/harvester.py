@@ -5,13 +5,13 @@ from joblib import Parallel, delayed
 import psutil
 import xmltodict
 from ratelimit import limits, sleep_and_retry
-import urllib.parse
+import sys
 
 class OxomoHarvester:
     """
     Class for harvesting data from OAI-PHM protocol
     """
-    def __init__(self,endpoints:dict ,mongo_db="oxomo", mongodb_uri="mongodb://localhost:27017/"):
+    def __init__(self,endpoints:dict ,mongo_db="oxomo", mongodb_uri="mongodb://localhost:27017/", force_http_get=True):
         """
         Harvester constructor
         
@@ -26,6 +26,7 @@ class OxomoHarvester:
         self.endpoints = endpoints
         self.mongo_db = mongo_db
         self.client = MongoClient(mongodb_uri)
+        self.force_http_get = force_http_get
         self.check_limit = {}
         for endpoint in self.endpoints.keys():
             if "rate_limit" in  self.endpoints[endpoint].keys():
@@ -41,7 +42,7 @@ class OxomoHarvester:
                     pass
                 self.check_limit[endpoint] = check_limit
         
-    def process_record(self,client:Client,identifier:str,metadataPrefix:str, mongo_collection:str,endpoint:str):
+    def process_record(self,client:Client,identifier:str,metadataPrefix:str, endpoint:str):
         """
         This method perform the request for the given record id and save it in the mongo
         collection and updates the checkpoint collection when it was inserted.
@@ -54,64 +55,89 @@ class OxomoHarvester:
             record id
         metadataPrefix:str
             metadata type for xml schema ex: dim, xoai, mods, oai_dc (default: oai_dc)
-        mongo_db:str
-            MongoDb name
-        mongo_collection:str
-            MongoDb collection name
+        endpoint:str
+            name of the endpoint to process and the MongoDb collection name
         """
         self.check_limit[endpoint]()
         
         try:
-            raw_record = client.makeRequest(**{'verb': 'GetRecord', 'identifier': urllib.parse.quote(identifier), 'metadataPrefix': metadataPrefix})
+            raw_record = client.makeRequest(**{'verb': 'GetRecord', 'identifier': identifier, 'metadataPrefix': metadataPrefix})
         except Exception as e:
             record={}
             record["identifier"]=identifier
             record["instance"]=str(type(e))
             record["item_type"]="record"         
             record["msg"]=str(e)
-            self.client[self.mongo_db][f"{mongo_collection}_errors"].insert_one(record)
-            self.ckp.update_record(self.mongo_db, mongo_collection,keys={"_id":identifier})
+            self.client[self.mongo_db][f"{endpoint}_errors"].insert_one(record)
+            self.ckp.update_record(self.mongo_db, endpoint,keys={"_id":identifier})
             print("=== ERROR ===")
             print(e)
             print(identifier)
             return
         
         record=xmltodict.parse(raw_record)
-        record["_id"]=identifier
+        record["_id"]=identifier            
         try:
-            self.client[self.mongo_db][f"{mongo_collection}_records"].insert_one(record)
-            self.ckp.update_record(self.mongo_db, mongo_collection,keys={"_id":identifier})
+            if "error" in record["OAI-PMH"].keys():
+                self.client[self.mongo_db][f"{endpoint}_invalid"].insert_one(record)
+            else:
+                self.client[self.mongo_db][f"{endpoint}_records"].insert_one(record)
+            self.ckp.update_record(self.mongo_db, endpoint,keys={"_id":identifier})
         except Exception as e:
             print(e, file=sys.stderr)
         finally:# performing atomic operation here(to be sure it was inserted)
-            if self.client[self.mongo_db][f"{mongo_collection}_records"].count_documents({"_id":identifier}) != 0:
-                self.ckp.update_record(self.mongo_db, mongo_collection,keys={"_id":identifier})
+            if self.client[self.mongo_db][f"{endpoint}_records"].count_documents({"_id":identifier}) != 0 or self.client[self.mongo_db][f"{endpoint}_invalid"].count_documents({"_id":identifier}) != 0:
+                self.ckp.update_record(self.mongo_db, endpoint,keys={"_id":identifier})
 
 
-    def process_records(self,client:Client,identifiers:list, metadataPrefix:str, mongo_collection:str,endpoint:str):
+    def process_records(self,client:Client,identifiers:list, metadataPrefix:str, endpoint:str):
+        """
+        This method makes a loop over the record to perform the request.
+        Also reports the progress in stdout every 1000 records.
+
+        Parameters:
+        ---------
+        client: oaipmh.client
+            oaipmh client instance 
+        identifiers:list
+            record ids
+        metadataPrefix:str
+            metadata type for xml schema ex: dim, xoai, mods, oai_dc (default: oai_dc)
+        endpoint:str
+            name of the endpoint to process and the MongoDb collection name
+        """
         count = 0
         size = len(identifiers)
         for identifier in identifiers:
-            self.process_record(client,identifier["_id"], metadataPrefix, mongo_collection,endpoint)
+            self.process_record(client,identifier["_id"], metadataPrefix, endpoint)
             if count%1000 == 0:
-                print(f"INFO: Downloaded {count} of {size} ({(count/size)*100:.2f}%) for {endpoint}")
+                print(f"=== INFO: Downloaded {count} of {size} ({(count/size)*100:.2f}%) for {endpoint}")
             count+=1
     
     def process_endpoint(self,endpoint:str,checkpoint:bool):
+        """
+        Method to parse endpoint config, handle checkpoint and process records.
+
+        Parameters:
+        ---------
+        endpoint:str
+            name of the endpoint to process and the MongoDb collection name
+        checkpoint:bool
+            Bool to enable checkpointing
+        """
         url = self.endpoints[endpoint]["url"]
         metadataPrefix = self.endpoints[endpoint]["metadataPrefix"]
-        mongo_collection = endpoint
         if checkpoint:
-            self.ckp.create(url,self.mongo_db,mongo_collection,metadataPrefix)
+            self.ckp.create(url,self.mongo_db,endpoint,metadataPrefix)
             
-        print(f"\n=== Processing {mongo_collection} from {url} ")
-        if self.ckp.exists_records(self.mongo_db, mongo_collection):
-            client = Client(url)
-            record_ids = self.ckp.get_records_regs(self.mongo_db,mongo_collection)
-            self.process_records(client,record_ids,metadataPrefix,mongo_collection,endpoint)
+        print(f"\n=== Processing {endpoint} from {url} ")
+        if self.ckp.exists_records(self.mongo_db, endpoint):
+            client = Client(url,force_http_get = self.force_http_get)
+            record_ids = self.ckp.get_records_regs(self.mongo_db,endpoint)
+            self.process_records(client,record_ids,metadataPrefix,endpoint)
         else:
             print(f"*** Error: records checkpoint for {endpoint} not found, create it first with ...")
-            print(f"*** Omitting records {url} {mongo_collection}")
+            print(f"*** Omitting records {url} {endpoint}")
             
     def run(self,checkpoint:bool=False,jobs:int=None):
         """
