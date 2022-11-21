@@ -6,7 +6,7 @@ import psutil
 
 class OxomoCheckPoint:
     """
-    Class to handle checkpoints for Colav D Space
+    Class to handle checkpoints for Colav OAI-PMH
     """
     def __init__(self, mongodb_uri="mongodb://localhost:27017/"):
         """
@@ -177,3 +177,4 @@ class OxomoCheckPoint:
             jobs = psutil.cpu_count()
         Parallel(n_jobs=jobs, backend='threading', verbose=10)(delayed(self.create)(
                 endpoints[key]["url"], mongo_db, key, endpoints[key]["metadataPrefix"]) for key in endpoints.keys())
+

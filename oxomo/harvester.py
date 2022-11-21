@@ -1,4 +1,5 @@
 from oxomo.checkpoint import OxomoCheckPoint
+from oxomo.ckpselective import OxomoCheckPointSelective
 from pymongo import MongoClient
 from oaipmh.client import Client
 from joblib import Parallel, delayed
@@ -11,7 +12,7 @@ class OxomoHarvester:
     """
     Class for harvesting data from OAI-PHM protocol
     """
-    def __init__(self,endpoints:dict ,mongo_db="oxomo", mongodb_uri="mongodb://localhost:27017/", force_http_get=True):
+    def __init__(self,endpoints:dict ,mongo_db="oxomo", mongodb_uri="mongodb://localhost:27017/", force_http_get=True, selective=True):
         """
         Harvester constructor
         
@@ -22,7 +23,10 @@ class OxomoHarvester:
         mongodb_uri:str
             MongoDB connection string uri
         """
-        self.ckp = OxomoCheckPoint(mongodb_uri)
+        if selective:
+            self.ckp = OxomoCheckPointSelective(mongodb_uri)
+        else:
+            self.ckp = OxomoCheckPoint(mongodb_uri)
         self.endpoints = endpoints
         self.mongo_db = mongo_db
         self.client = MongoClient(mongodb_uri)
