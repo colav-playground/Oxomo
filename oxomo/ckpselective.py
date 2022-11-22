@@ -22,7 +22,7 @@ class OxomoCheckPointSelective:
         """
         self.client = MongoClient(mongodb_uri)
 
-    def create(self, base_url: str, mongo_db: str, mongo_collection: str, metadataPrefix='oai_dc', force_http_get=True, days=30):
+    def create(self, base_url: str, mongo_db: str, mongo_collection: str, metadataPrefix='oai_dc', force_http_get=True, days=30, max_tries=4):  # noqa: E501
         """
         Method to create the checkpoint, this allows to save all the ids for records and sets
         in order to know what was downloaded.
@@ -53,7 +53,8 @@ class OxomoCheckPointSelective:
             print(f"=== ERROR: CheckPoint can not be created for {mongo_collection} omitting..")
             return
 
-        print(f"=== Creating CheckPoint for {mongo_collection} from  {base_url}", flush=True)
+        print(f"=== Creating CheckPoint for {mongo_collection} from  {base_url} with metadataPrefix {metadataPrefix}", flush=True)
+        
         info = {}
         info["repository_name"] = identity.repositoryName()
         info["admin_emails"] = identity.adminEmails()
@@ -65,8 +66,9 @@ class OxomoCheckPointSelective:
         self.client[mongo_db][f"{mongo_collection}_identity"].drop()
         self.client[mongo_db][f"{mongo_collection}_identity"].insert_one(info)
 
-        delta = 60*60*24
-        ckp = self.client[mongo_db][f"{mongo_collection}_identifiers"].find_one({"_id": 0})
+        delta = 60 * 60 * 24
+        col_identifiers = self.client[mongo_db][f"{mongo_collection}_identifiers"]
+        ckp = col_identifiers.find_one({"_id": 0})
         if ckp is not None:
             if "final_date" in ckp.keys():
                 init_date = ckp["final_date"]
@@ -74,17 +76,26 @@ class OxomoCheckPointSelective:
                 init_date = identity.earliestDatestamp()
         else:
             init_date = identity.earliestDatestamp()
-            self.client[mongo_db][f"{mongo_collection}_identifiers"].insert_one(
-                {"_id": 0, "initial_date": init_date})
-        end_date = init_date+timedelta(days=days)
+            col_identifiers.insert_one({"_id": 0, "initial_date": init_date})
+        end_date = init_date + timedelta(days=days)
         end_date = end_date.replace(hour=0, minute=0, second=0)
         if end_date > datetime.today():
             end_date = datetime.today().replace(microsecond=0)
         while init_date < datetime.today():
             print("=== INFO:", init_date, "----", end_date, mongo_collection)
-            params = {"verb": "ListIdentifiers", "metadataPrefix": "dim",
+            params = {"verb": "ListIdentifiers", "metadataPrefix": metadataPrefix,
                       "from": init_date.isoformat(), "until": end_date.isoformat()}
-            ids = client.makeRequest(**params)
+            for i in range(max_tries):
+                try:
+                    ids = client.makeRequest(**params)
+                    break
+                except BaseException as err:
+                    print(f"=== ERROR: Unexpected {err}, {type(err)}")
+                    print(f"=== ERROR: CheckPoint try {i} of {max_tries} for {base_url}")
+                    if i == (max_tries-1):
+                        print(f"=== ERROR: CheckPoint can not be created for {base_url} with params {params}")
+                        return
+
             ids = xmltodict.parse(ids)
             identifiers = []
             total = 0
@@ -92,7 +103,7 @@ class OxomoCheckPointSelective:
                 if ids['OAI-PMH']["error"]['@code'] == 'noRecordsMatch':
                     # records not found in the period of time
                     # setting next time range
-                    self.client[mongo_db][f"{mongo_collection}_identifiers"].update_one(
+                    col_identifiers.update_one(
                         {"_id": 0}, {"$set": {"final_date": end_date}})
                     init_date = end_date + timedelta(seconds=delta)
                     end_date = init_date + timedelta(days=days)
@@ -100,7 +111,7 @@ class OxomoCheckPointSelective:
                         end_date = datetime.today().replace(microsecond=0)
                     continue
                 else:
-                    print(ids['OAI-PMH']["error"]['@code'])
+                    print("=== ERROR:",ids['OAI-PMH']["error"]['@code'],mongo_collection,base_url,params),
                     print(init_date, "----", end_date, "ERROR creating checkpoint!!!", mongo_collection)
                     break
             if ids['OAI-PMH']['ListIdentifiers'] is None:
@@ -135,10 +146,13 @@ class OxomoCheckPointSelective:
                 for i in identifiers:
                     i["downloaded"] = False
             if len(identifiers) != 0:
-                self.client[mongo_db][f"{mongo_collection}_identifiers"].update_one({"_id": 0}, {"$set": {"final_date": end_date}, '$push': {
-                                                                                    'identifiers': {'$each': identifiers}, 'ranges': {"init_date": init_date, 'final_date': end_date, "n_records": total}}}, upsert=True)
+                col_identifiers.update_one({"_id": 0}, {"$set": {"final_date": end_date},
+                                          '$push': {'identifiers': {'$each': identifiers},
+                                          'ranges': {"init_date": init_date,
+                                          'final_date': end_date, "n_records": total}}},
+                                          upsert=True)
             else:
-                self.client[mongo_db][f"{mongo_collection}_identifiers"].update_one(
+                col_identifiers.update_one(
                     {"_id": 0}, {"$set": {"final_date": end_date}})
             init_date = end_date + timedelta(seconds=delta)
             end_date = init_date + timedelta(days=days)
@@ -211,8 +225,7 @@ class OxomoCheckPointSelective:
             {"$unwind": "$identifiers"},
             {"$match": {"$and": [{"identifiers.@status": {"$ne": "deleted"}},
                                  {"identifiers.downloaded": False}]}},
-            {"$addFields": {"identifier": "$identifiers.identifier"}},
-            {"$addFields": {"_id": "$identifier"}},
+            {"$addFields": {"_id": "$identifiers.identifier"}},
             {"$project": {"_id": 1}},
         ]
         ckp_col = self.client[mongo_db][f"{mongo_collection}_identifiers"]

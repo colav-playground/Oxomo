@@ -92,7 +92,7 @@ class OxomoHarvester:
                 self.client[self.mongo_db][f"{endpoint}_records"].insert_one(record)
             self.ckp.update_record(self.mongo_db, endpoint, keys={"_id": identifier})
         except Exception as e:
-            print(e, file=sys.stderr)
+            print("=== ERROR: ", e, endpoint, file=sys.stderr)
         finally:  # performing atomic operation here(to be sure it was inserted)
             if self.client[self.mongo_db][f"{endpoint}_records"].count_documents({"_id": identifier}) != 0 or self.client[self.mongo_db][f"{endpoint}_invalid"].count_documents({"_id": identifier}) != 0:
                 self.ckp.update_record(self.mongo_db, endpoint, keys={"_id": identifier})
