@@ -19,10 +19,8 @@ parser.add_argument('--mongo_dbname', type=str,
 parser.add_argument('--config', type=str,required=True, help='python file with a dictionary called endpoints, take a look in the README for more information.')
 parser.add_argument('--drop_mongodb', action='store_true',
                     help='delete the database, use it with carefull, deletes everything!')
-parser.add_argument('--checkpoint', action='store_true',
-                    help='create a checkpoint, if it already exists then perform incremental checkpoint')
 
-def check_endpoints(endpoints):
+def check_endpoints_config(endpoints):
     """
     Allows to check the json config file is well defined.
     """
@@ -40,6 +38,16 @@ def check_endpoints(endpoints):
             if "secs" not in endpoints[i]["rate_limit"].keys():
                 print(f"ERROR: bad config file, 'secs' field not found for 'rate_limit' in the endpoint {i}")
                 return False
+        if "checkpoint" not in endpoints[i].keys():
+            print(f"ERROR: bad config file, 'checkpoint' field not found for {i}")
+            return False
+        if "enabled" not in endpoints[i]["checkpoint"].keys():
+            print(f"ERROR: bad config file, 'enabled' field not found for 'checkpoint' in the endpoint {i}")
+            return False
+        if "selective" not in endpoints[i]["checkpoint"].keys():
+            print(f"ERROR: bad config file, 'selective' field not found for 'checkpoint' in the endpoint {i}")
+            return False
+        
     return True
 
 if __name__ == '__main__':
@@ -53,12 +61,9 @@ if __name__ == '__main__':
     config = importlib.util.module_from_spec(spec)
     loader.exec_module(config)
     endpoints= config.endpoints
-    if check_endpoints(endpoints) == False:
+    if check_endpoints_config(endpoints) == False:
         print(f"ERROR: config file {config_file} error, fix the configuration to continue, please take a look in the README.md to get some help.")
         print(f"ERROR: aborting execution")
         sys.exit(1)
-    #if args.checkpoint:
-    #    ckp = OxomoCheckPoint(mongodb_uri=args.mongo_dburi)
-    #    ckp.run(endpoints,args.mongo_dbname,max_threads)
     harvester = OxomoHarvester(endpoints,args.mongo_dbname,args.mongo_dburi)
-    harvester.run(args.checkpoint, max_threads)
+    harvester.run(max_threads)

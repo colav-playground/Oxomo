@@ -14,26 +14,26 @@ class OxomoHarvester:
     Class for harvesting data from OAI-PHM protocol
     """
 
-    def __init__(self, endpoints: dict, mongo_db="oxomo", mongodb_uri="mongodb://localhost:27017/", force_http_get=True, selective=True):
+    def __init__(self, endpoints: dict, mongo_db="oxomo", mongodb_uri="mongodb://localhost:27017/", force_http_get=True):
         """
         Harvester constructor
 
         Parameters:
         ----------
         endpoints:dict
-            dictionary with dspace endpoint url and university name
+            dictionary with parameters for endpoints such as url, name, rate-limit, etc..
+        mongo_db:str
+            MongoDB name, default value "oxomo"
         mongodb_uri:str
             MongoDB connection string uri
         """
-        if selective:
-            self.ckp = OxomoCheckPointSelective(mongodb_uri)
-        else:
-            self.ckp = OxomoCheckPoint(mongodb_uri)
         self.endpoints = endpoints
         self.mongo_db = mongo_db
+        self.mongodb_uri = mongodb_uri
         self.client = MongoClient(mongodb_uri)
         self.force_http_get = force_http_get
         self.check_limit = {}
+        self.checkpoint = {}
         for endpoint in self.endpoints.keys():
             if "rate_limit" in self.endpoints[endpoint].keys():
                 calls = self.endpoints[endpoint]["rate_limit"]["calls"]
@@ -77,7 +77,7 @@ class OxomoHarvester:
             record["item_type"] = "record"
             record["msg"] = str(e)
             self.client[self.mongo_db][f"{endpoint}_errors"].insert_one(record)
-            self.ckp.update_record(self.mongo_db, endpoint, keys={"_id": identifier})
+            self.checkpoint[endpoint].update_record(self.mongo_db, endpoint, keys={"_id": identifier})
             print("=== ERROR ===")
             print(e)
             print(identifier)
@@ -90,12 +90,12 @@ class OxomoHarvester:
                 self.client[self.mongo_db][f"{endpoint}_invalid"].insert_one(record)
             else:
                 self.client[self.mongo_db][f"{endpoint}_records"].insert_one(record)
-            self.ckp.update_record(self.mongo_db, endpoint, keys={"_id": identifier})
+            self.checkpoint[endpoint].update_record(self.mongo_db, endpoint, keys={"_id": identifier})
         except Exception as e:
             print("=== ERROR: ", e, endpoint, file=sys.stderr)
         finally:  # performing atomic operation here(to be sure it was inserted)
             if self.client[self.mongo_db][f"{endpoint}_records"].count_documents({"_id": identifier}) != 0 or self.client[self.mongo_db][f"{endpoint}_invalid"].count_documents({"_id": identifier}) != 0:
-                self.ckp.update_record(self.mongo_db, endpoint, keys={"_id": identifier})
+                self.checkpoint[endpoint].update_record(self.mongo_db, endpoint, keys={"_id": identifier})
 
     def process_records(self, client: Client, identifiers: list, metadataPrefix: str, endpoint: str):
         """
@@ -122,7 +122,7 @@ class OxomoHarvester:
                     f"=== INFO: Downloaded {count} of {size} ({(count/size)*100:.2f}%) for {endpoint}")
             count += 1
 
-    def process_endpoint(self, endpoint: str, checkpoint: bool):
+    def process_endpoint(self, endpoint: str):
         """
         Method to parse endpoint config, handle checkpoint and process records.
 
@@ -135,13 +135,19 @@ class OxomoHarvester:
         """
         url = self.endpoints[endpoint]["url"]
         metadataPrefix = self.endpoints[endpoint]["metadataPrefix"]
+        selective = self.endpoints[endpoint]["checkpoint"]["selective"]
+        checkpoint = self.endpoints[endpoint]["checkpoint"]["enabled"]
+        if selective:
+            self.checkpoint[endpoint] = OxomoCheckPointSelective(self.mongodb_uri)
+        else:
+            self.checkpoint[endpoint] = OxomoCheckPoint(self.mongodb_uri)
         if checkpoint:
-            self.ckp.create(url, self.mongo_db, endpoint, metadataPrefix)
+            self.checkpoint[endpoint].create(url, self.mongo_db, endpoint, metadataPrefix)
 
         print(f"\n=== Processing {endpoint} from {url} ")
-        if self.ckp.exists_records(self.mongo_db, endpoint):
+        if self.checkpoint[endpoint].exists_records(self.mongo_db, endpoint):
             client = Client(url, force_http_get=self.force_http_get)
-            record_ids = self.ckp.get_records_regs(self.mongo_db, endpoint)
+            record_ids = self.checkpoint[endpoint].get_records_regs(self.mongo_db, endpoint)
             self.process_records(client, record_ids, metadataPrefix, endpoint)
         else:
             print(
@@ -164,4 +170,4 @@ class OxomoHarvester:
         if jobs > len(self.endpoints.keys()):
             jobs = len(self.endpoints.keys())
         Parallel(n_jobs=jobs, backend='threading', verbose=10)(delayed(self.process_endpoint)(
-            endpoint, checkpoint) for endpoint in self.endpoints.keys())
+            endpoint) for endpoint in self.endpoints.keys())
