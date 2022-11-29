@@ -16,9 +16,11 @@ parser.add_argument('--mongo_dburi', type=str,
                     default='mongodb://localhost:27017/', help='uri for MongoDb database')
 parser.add_argument('--mongo_dbname', type=str,
                     default="oxomo", help='MongoDb name to save the data.')
-parser.add_argument('--config', type=str,required=True, help='python file with a dictionary called endpoints, take a look in the README for more information.')
+parser.add_argument('--config', type=str, required=True,
+                    help='python file with a dictionary called endpoints, take a look in the README for more information.')
 parser.add_argument('--drop_mongodb', action='store_true',
                     help='delete the database, use it with carefull, deletes everything!')
+
 
 def check_endpoints_config(endpoints):
     """
@@ -28,42 +30,53 @@ def check_endpoints_config(endpoints):
         if "url" not in endpoints[i].keys():
             print(f"ERROR: bad config file, 'url' field not found for {i}")
             return False
+        if "enabled" not in endpoints[i].keys():
+            print(f"ERROR: bad config file, 'enabled' field not found for {i}")
+            return False
         if "metadataPrefix" not in endpoints[i].keys():
-            print(f"ERROR: bad config file, 'metadataPrefix' field not found for {i}")
+            print(
+                f"ERROR: bad config file, 'metadataPrefix' field not found for {i}")
             return False
         if "rate_limit" in endpoints[i].keys():
             if "calls" not in endpoints[i]["rate_limit"].keys():
-                print(f"ERROR: bad config file, 'calls' field not found for 'rate_limit' in the endpoint {i}")
+                print(
+                    f"ERROR: bad config file, 'calls' field not found for 'rate_limit' in the endpoint {i}")
                 return False
             if "secs" not in endpoints[i]["rate_limit"].keys():
-                print(f"ERROR: bad config file, 'secs' field not found for 'rate_limit' in the endpoint {i}")
+                print(
+                    f"ERROR: bad config file, 'secs' field not found for 'rate_limit' in the endpoint {i}")
                 return False
         if "checkpoint" not in endpoints[i].keys():
-            print(f"ERROR: bad config file, 'checkpoint' field not found for {i}")
+            print(
+                f"ERROR: bad config file, 'checkpoint' field not found for {i}")
             return False
         if "enabled" not in endpoints[i]["checkpoint"].keys():
-            print(f"ERROR: bad config file, 'enabled' field not found for 'checkpoint' in the endpoint {i}")
+            print(
+                f"ERROR: bad config file, 'enabled' field not found for 'checkpoint' in the endpoint {i}")
             return False
         if "selective" not in endpoints[i]["checkpoint"].keys():
-            print(f"ERROR: bad config file, 'selective' field not found for 'checkpoint' in the endpoint {i}")
+            print(
+                f"ERROR: bad config file, 'selective' field not found for 'checkpoint' in the endpoint {i}")
             return False
-        
+
     return True
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
     max_threads = args.max_threads
     config_file = args.config
-    #with open(config_file) as f:
+    # with open(config_file) as f:
     #    endpoints = json.load(f)
     loader = importlib.machinery.SourceFileLoader('config', config_file)
     spec = importlib.util.spec_from_loader(loader.name, loader)
     config = importlib.util.module_from_spec(spec)
     loader.exec_module(config)
-    endpoints= config.endpoints
+    endpoints = config.endpoints
     if check_endpoints_config(endpoints) == False:
-        print(f"ERROR: config file {config_file} error, fix the configuration to continue, please take a look in the README.md to get some help.")
+        print(
+            f"ERROR: config file {config_file} error, fix the configuration to continue, please take a look in the README.md to get some help.")
         print(f"ERROR: aborting execution")
         sys.exit(1)
-    harvester = OxomoHarvester(endpoints,args.mongo_dbname,args.mongo_dburi)
+    harvester = OxomoHarvester(endpoints, args.mongo_dbname, args.mongo_dburi)
     harvester.run(max_threads)

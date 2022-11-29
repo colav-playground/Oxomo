@@ -77,7 +77,8 @@ class OxomoHarvester:
             record["item_type"] = "record"
             record["msg"] = str(e)
             self.client[self.mongo_db][f"{endpoint}_errors"].insert_one(record)
-            self.checkpoint[endpoint].update_record(self.mongo_db, endpoint, keys={"_id": identifier})
+            self.checkpoint[endpoint].update_record(
+                self.mongo_db, endpoint, keys={"_id": identifier})
             print("=== ERROR ===")
             print(e)
             print(identifier)
@@ -87,15 +88,20 @@ class OxomoHarvester:
         record["_id"] = identifier
         try:
             if "error" in record["OAI-PMH"].keys():
-                self.client[self.mongo_db][f"{endpoint}_invalid"].insert_one(record)
+                self.client[self.mongo_db][f"{endpoint}_invalid"].insert_one(
+                    record)
             else:
-                self.client[self.mongo_db][f"{endpoint}_records"].insert_one(record)
-            self.checkpoint[endpoint].update_record(self.mongo_db, endpoint, keys={"_id": identifier})
+                self.client[self.mongo_db][f"{endpoint}_records"].insert_one(
+                    record)
+            self.checkpoint[endpoint].update_record(
+                self.mongo_db, endpoint, keys={"_id": identifier})
         except Exception as e:
             print("=== ERROR: ", e, endpoint, file=sys.stderr)
-        finally:  # performing atomic operation here(to be sure it was inserted)
+        # performing atomic operation here(to be sure it was inserted)
+        finally:
             if self.client[self.mongo_db][f"{endpoint}_records"].count_documents({"_id": identifier}) != 0 or self.client[self.mongo_db][f"{endpoint}_invalid"].count_documents({"_id": identifier}) != 0:
-                self.checkpoint[endpoint].update_record(self.mongo_db, endpoint, keys={"_id": identifier})
+                self.checkpoint[endpoint].update_record(
+                    self.mongo_db, endpoint, keys={"_id": identifier})
 
     def process_records(self, client: Client, identifiers: list, metadataPrefix: str, endpoint: str):
         """
@@ -116,7 +122,8 @@ class OxomoHarvester:
         count = 0
         size = len(identifiers)
         for identifier in identifiers:
-            self.process_record(client, identifier["_id"], metadataPrefix, endpoint)
+            self.process_record(
+                client, identifier["_id"], metadataPrefix, endpoint)
             if count % 1000 == 0:
                 print(
                     f"=== INFO: Downloaded {count} of {size} ({(count/size)*100:.2f}%) for {endpoint}")
@@ -138,23 +145,26 @@ class OxomoHarvester:
         selective = self.endpoints[endpoint]["checkpoint"]["selective"]
         checkpoint = self.endpoints[endpoint]["checkpoint"]["enabled"]
         if selective:
-            self.checkpoint[endpoint] = OxomoCheckPointSelective(self.mongodb_uri)
+            self.checkpoint[endpoint] = OxomoCheckPointSelective(
+                self.mongodb_uri)
         else:
             self.checkpoint[endpoint] = OxomoCheckPoint(self.mongodb_uri)
         if checkpoint:
-            self.checkpoint[endpoint].create(url, self.mongo_db, endpoint, metadataPrefix)
+            self.checkpoint[endpoint].create(
+                url, self.mongo_db, endpoint, metadataPrefix)
 
         print(f"\n=== Processing {endpoint} from {url} ")
         if self.checkpoint[endpoint].exists_records(self.mongo_db, endpoint):
             client = Client(url, force_http_get=self.force_http_get)
-            record_ids = self.checkpoint[endpoint].get_records_regs(self.mongo_db, endpoint)
+            record_ids = self.checkpoint[endpoint].get_records_regs(
+                self.mongo_db, endpoint)
             self.process_records(client, record_ids, metadataPrefix, endpoint)
         else:
             print(
                 f"*** Error: records checkpoint for {endpoint} not found, create it first with ...")
             print(f"*** Omitting records {url} {endpoint}")
 
-    def run(self, checkpoint: bool = False, jobs: int = None):
+    def run(self, jobs: int = None):
         """
         Method to start the harvesting of the data in the multiples endpoints in parallel.
         You have to create the checkpoint first, before call this method.
@@ -165,9 +175,16 @@ class OxomoHarvester:
             number of jobs for parallel execution, if the value is None, it will
             take the number of threads available in the cpu.
         """
+        endpoints_names = self.endpoints.keys()
         if jobs is None:
             jobs = psutil.cpu_count()
-        if jobs > len(self.endpoints.keys()):
-            jobs = len(self.endpoints.keys())
+        if jobs > len(endpoints_names):
+            jobs = len(endpoints_names)
+        endpoints = []
+        for endpoint in endpoints_names:
+            if self.endpoints[endpoint]["enabled"]:
+                endpoints.append(endpoint)
+            else:
+                print(f"=== INFO: repository {endpoint} is disabled, skipped!")
         Parallel(n_jobs=jobs, backend='threading', verbose=10)(delayed(self.process_endpoint)(
-            endpoint) for endpoint in self.endpoints.keys())
+            endpoint) for endpoint in endpoints)
