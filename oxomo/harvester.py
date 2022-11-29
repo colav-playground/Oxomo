@@ -57,7 +57,7 @@ class OxomoHarvester:
         Parameters:
         ---------
         client: oaipmh.client
-            oaipmh client instance 
+            oaipmh client instance
         identifier:str
             record id
         metadataPrefix:str
@@ -97,9 +97,11 @@ class OxomoHarvester:
                 self.mongo_db, endpoint, keys={"_id": identifier})
         except Exception as e:
             print("=== ERROR: ", e, endpoint, file=sys.stderr)
-        # performing atomic operation here(to be sure it was inserted)
+        # performing "atomic" operation here(to be sure it was inserted)
         finally:
-            if self.client[self.mongo_db][f"{endpoint}_records"].count_documents({"_id": identifier}) != 0 or self.client[self.mongo_db][f"{endpoint}_invalid"].count_documents({"_id": identifier}) != 0:
+            rcount = self.client[self.mongo_db][f"{endpoint}_records"].count_documents({"_id": identifier})
+            icount = self.client[self.mongo_db][f"{endpoint}_invalid"].count_documents({"_id": identifier})
+            if rcount != 0 or icount != 0:
                 self.checkpoint[endpoint].update_record(
                     self.mongo_db, endpoint, keys={"_id": identifier})
 
@@ -111,7 +113,7 @@ class OxomoHarvester:
         Parameters:
         ---------
         client: oaipmh.client
-            oaipmh client instance 
+            oaipmh client instance
         identifiers:list
             record ids
         metadataPrefix:str

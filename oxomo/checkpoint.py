@@ -72,7 +72,7 @@ class OxomoCheckPoint:
         if self.exists_records(mongo_db, mongo_collection):
             print(
                 f"=== Getting Records ids from {base_url}  for {mongo_collection}")
-            print(f"=== Calling incremental checkpoints")
+            print("=== Calling incremental checkpoints")
             old_ids = list(self.client[mongo_db]
                            [f"{mongo_collection}_identifiers"].find({}, {'_ids': 1}))
             old_ids = [i["_id"] for i in old_ids]
@@ -184,7 +184,7 @@ class OxomoCheckPoint:
         mongo_db: str
             database name
         jobs: int
-            number of threads for the parallel execution, 
+            number of threads for the parallel execution,
             if None maximum allowed by the cpu.
         """
         if jobs is None:
