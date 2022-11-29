@@ -49,12 +49,15 @@ class OxomoCheckPointSelective:
             print(f"=== ERROR: CheckPoint can not be created for {base_url}")
             return
         if metadataPrefix not in [i[0] for i in client.listMetadataFormats()]:
-            print(f"=== ERROR: metadataPrefix {metadataPrefix}, not supported for {base_url}")
-            print(f"=== ERROR: CheckPoint can not be created for {mongo_collection} omitting..")
+            print(
+                f"=== ERROR: metadataPrefix {metadataPrefix}, not supported for {base_url}")
+            print(
+                f"=== ERROR: CheckPoint can not be created for {mongo_collection} omitting..")
             return
 
-        print(f"=== Creating CheckPoint for {mongo_collection} from  {base_url} with metadataPrefix {metadataPrefix}", flush=True)
-        
+        print(
+            f"=== Creating CheckPoint for {mongo_collection} from  {base_url} with metadataPrefix {metadataPrefix}")
+
         info = {}
         info["repository_name"] = identity.repositoryName()
         info["admin_emails"] = identity.adminEmails()
@@ -91,9 +94,11 @@ class OxomoCheckPointSelective:
                     break
                 except BaseException as err:
                     print(f"=== ERROR: Unexpected {err}, {type(err)}")
-                    print(f"=== ERROR: CheckPoint try {i} of {max_tries} for {base_url}")
-                    if i == (max_tries-1):
-                        print(f"=== ERROR: CheckPoint can not be created for {base_url} with params {params}")
+                    print(
+                        f"=== ERROR: CheckPoint try {i} of {max_tries} for {base_url}")
+                    if i == (max_tries - 1):
+                        print(
+                            f"=== ERROR: CheckPoint can not be created for {base_url} with params {params}")
                         return
 
             ids = xmltodict.parse(ids)
@@ -111,16 +116,20 @@ class OxomoCheckPointSelective:
                         end_date = datetime.today().replace(microsecond=0)
                     continue
                 else:
-                    print("=== ERROR:",ids['OAI-PMH']["error"]['@code'],mongo_collection,base_url,params),
-                    print(init_date, "----", end_date, "ERROR creating checkpoint!!!", mongo_collection)
+                    print("=== ERROR:", ids['OAI-PMH']["error"]
+                          ['@code'], mongo_collection, base_url, params),
+                    print(init_date, "----", end_date,
+                          "ERROR creating checkpoint!!!", mongo_collection)
                     break
             if ids['OAI-PMH']['ListIdentifiers'] is None:
                 pass
             else:
                 identifiers = ids['OAI-PMH']['ListIdentifiers']["header"]
-                if type(identifiers) is not list:  # if there is only one register is returning a dict, instead list
+                # if there is only one register is returning a dict, instead list
+                if type(identifiers) is not list:
                     identifiers = [identifiers]
-                resumptionToken = "resumptionToken" in ids['OAI-PMH']['ListIdentifiers'].keys()
+                resumptionToken = "resumptionToken" in ids['OAI-PMH']['ListIdentifiers'].keys(
+                )
                 if not resumptionToken:
                     total = len(identifiers)
                 while resumptionToken:
@@ -129,7 +138,8 @@ class OxomoCheckPointSelective:
                     total = eval(ids['OAI-PMH']['ListIdentifiers']['resumptionToken']
                                  ['@completeListSize'])  # this is int for dspace
                     if type(total) is not int:
-                        total = total["value"]  # this is for zenodo, maybe other implementations?
+                        # this is for zenodo, maybe other implementations?
+                        total = total["value"]
                     if '#text' in ids['OAI-PMH']['ListIdentifiers']['resumptionToken'].keys():
                         params['resumptionToken'] = ids['OAI-PMH']['ListIdentifiers']['resumptionToken']['#text']
                     else:
@@ -137,20 +147,22 @@ class OxomoCheckPointSelective:
                     ids = client.makeRequest(**params)
                     ids = xmltodict.parse(ids)
                     _ids = ids['OAI-PMH']['ListIdentifiers']["header"]
-                    if type(_ids) is not list:  # if there is only one register is returning a dict, instead list
+                    # if there is only one register is returning a dict, instead list
+                    if type(_ids) is not list:
                         _ids = [_ids]
                     identifiers += _ids
-                    resumptionToken = "resumptionToken" in ids['OAI-PMH']['ListIdentifiers'].keys()
+                    resumptionToken = "resumptionToken" in ids['OAI-PMH']['ListIdentifiers'].keys(
+                    )
                     print("=== INFO:", init_date, "----", end_date, mongo_collection,
                           f"Pagination {len(identifiers)} of {total}", flush=True)
                 for i in identifiers:
                     i["downloaded"] = False
             if len(identifiers) != 0:
                 col_identifiers.update_one({"_id": 0}, {"$set": {"final_date": end_date},
-                                          '$push': {'identifiers': {'$each': identifiers},
-                                          'ranges': {"init_date": init_date,
-                                          'final_date': end_date, "n_records": total}}},
-                                          upsert=True)
+                                                        '$push': {'identifiers': {'$each': identifiers},
+                                                                  'ranges': {"init_date": init_date,
+                                                                             'final_date': end_date, "n_records": total}}},
+                                           upsert=True)
             else:
                 col_identifiers.update_one(
                     {"_id": 0}, {"$set": {"final_date": end_date}})
@@ -202,7 +214,9 @@ class OxomoCheckPointSelective:
             Dictionary with _id and other required values to perform the update.
         """
         self.client[mongo_db][f"{mongo_collection}_identifiers"].update_one({"_id": 0}, {"$set": {
-                                                                            "identifiers.$[idx].downloaded":  True}}, upsert=True, array_filters=[{'idx.identifier': keys["_id"]}])
+                                                                            "identifiers.$[idx].downloaded": True}},
+                                                                            upsert=True,
+                                                                            array_filters=[{'idx.identifier': keys["_id"]}])
 
     def get_records_regs(self, mongo_db: str, mongo_collection: str):
         """
@@ -244,11 +258,12 @@ class OxomoCheckPointSelective:
         mongo_db: str
             database name
         jobs: int
-            number of threads for the parallel execution, 
+            number of threads for the parallel execution,
             if None maximum allowed by the cpu.
         """
         if jobs is None:
             jobs = psutil.cpu_count()
 
         Parallel(n_jobs=jobs, backend="threading", verbose=10)(delayed(self.create)(
-            endpoints[endpoint]["url"], mongo_db, endpoint, endpoints[endpoint]["metadataPrefix"]) for endpoint in endpoints.keys())
+            endpoints[endpoint]["url"], mongo_db,
+            endpoint, endpoints[endpoint]["metadataPrefix"]) for endpoint in endpoints.keys())

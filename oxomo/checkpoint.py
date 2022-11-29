@@ -42,18 +42,22 @@ class OxomoCheckPoint:
 
         client = Client(base_url, force_http_get=force_http_get)
         try:
-            print(f"=== INFO: Checking identity for {mongo_collection} from  {base_url}")
+            print(
+                f"=== INFO: Checking identity for {mongo_collection} from  {base_url}")
             identity = client.identify()
         except BaseException as err:
             print(f"=== ERROR: Unexpected {err=}, {type(err)=}")
             print(f"=== ERROR: CheckPoint can not be created for {base_url}")
             return
         if metadataPrefix not in [i[0] for i in client.listMetadataFormats()]:
-            print(f"=== ERROR: metadataPrefix {metadataPrefix}, not supported for {base_url}")
-            print(f"=== ERROR: CheckPoint can not be created for {mongo_collection} omitting..")
+            print(
+                f"=== ERROR: metadataPrefix {metadataPrefix}, not supported for {base_url}")
+            print(
+                f"=== ERROR: CheckPoint can not be created for {mongo_collection} omitting..")
             return
 
-        print(f"=== INFO: Creating CheckPoint for {mongo_collection} from  {base_url}")
+        print(
+            f"=== INFO: Creating CheckPoint for {mongo_collection} from  {base_url}")
         info = {}
         info["repository_name"] = identity.repositoryName()
         info["admin_emails"] = identity.adminEmails()
@@ -66,14 +70,16 @@ class OxomoCheckPoint:
         self.client[mongo_db][f"{mongo_collection}_identity"].insert_one(info)
 
         if self.exists_records(mongo_db, mongo_collection):
-            print(f"=== Getting Records ids from {base_url}  for {mongo_collection}")
+            print(
+                f"=== Getting Records ids from {base_url}  for {mongo_collection}")
             print(f"=== Calling incremental checkpoints")
             old_ids = list(self.client[mongo_db]
                            [f"{mongo_collection}_identifiers"].find({}, {'_ids': 1}))
             old_ids = [i["_id"] for i in old_ids]
         else:
             old_ids = []
-            print(f"=== Getting Records ids from {base_url}  for {mongo_collection}")
+            print(
+                f"=== Getting Records ids from {base_url}  for {mongo_collection}")
 
         ids = client.listIdentifiers(metadataPrefix=metadataPrefix)
         identifiers = []
@@ -90,10 +96,13 @@ class OxomoCheckPoint:
                 identifiers.append(identifier)
             counter += 1
             if counter % 1000 == 0:
-                print(f"=== INFO: CheckPoint: Processed {counter} records for {mongo_collection}")
-        identifiers = list({item['_id']: item for item in identifiers}.values())
+                print(
+                    f"=== INFO: CheckPoint: Processed {counter} records for {mongo_collection}")
+        identifiers = list(
+            {item['_id']: item for item in identifiers}.values())
         if len(identifiers) > 0:
-            self.client[mongo_db][f"{mongo_collection}_identifiers"].insert_many(identifiers)
+            self.client[mongo_db][f"{mongo_collection}_identifiers"].insert_many(
+                identifiers)
         print("=== INFO: Records CheckPoint total records found = {} for {}".format(
             len(identifiers), f"{mongo_collection}_identifiers"))
 
