@@ -42,6 +42,7 @@ class OxomoCheckPoint:
 
         client = Client(base_url, force_http_get=force_http_get)
         try:
+            print(f"=== INFO: Checking identity for {mongo_collection} from  {base_url}")
             identity = client.identify()
         except BaseException as err:
             print(f"=== ERROR: Unexpected {err=}, {type(err)=}")
@@ -52,7 +53,7 @@ class OxomoCheckPoint:
             print(f"=== ERROR: CheckPoint can not be created for {mongo_collection} omitting..")
             return
 
-        print(f"=== Creating CheckPoint for {mongo_collection} from  {base_url}")
+        print(f"=== INFO: Creating CheckPoint for {mongo_collection} from  {base_url}")
         info = {}
         info["repository_name"] = identity.repositoryName()
         info["admin_emails"] = identity.adminEmails()
@@ -89,11 +90,11 @@ class OxomoCheckPoint:
                 identifiers.append(identifier)
             counter += 1
             if counter % 1000 == 0:
-                print(f"CheckPoint: Processed {counter} records for {mongo_collection}")
+                print(f"=== INFO: CheckPoint: Processed {counter} records for {mongo_collection}")
         identifiers = list({item['_id']: item for item in identifiers}.values())
         if len(identifiers) > 0:
             self.client[mongo_db][f"{mongo_collection}_identifiers"].insert_many(identifiers)
-        print("=== Records CheckPoint total records found = {} for {}".format(
+        print("=== INFO: Records CheckPoint total records found = {} for {}".format(
             len(identifiers), f"{mongo_collection}_identifiers"))
 
     def exists_records(self, mongo_db: str, mongo_collection: str):
