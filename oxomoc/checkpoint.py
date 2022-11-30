@@ -4,7 +4,7 @@ from pymongo import MongoClient
 import psutil
 
 
-class OxomoCheckPoint:
+class OxomocCheckPoint:
     """
     Class to handle checkpoints for Colav OAI-PMH
     """

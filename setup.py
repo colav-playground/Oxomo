@@ -51,10 +51,10 @@ if os.name in ('nt', 'dos'):
 def main():
     setup(
         # Application name:
-        name="Oxomo",
+        name="Oxomoc",
 
         # Version number (initial):
-        version=get_version('oxomo/_version.py'),
+        version=get_version('oxomoc/_version.py'),
 
         # Application author details:
         author="Colav",
@@ -67,8 +67,8 @@ def main():
         include_package_data=True,
 
         # Details
-        url="https://github.com/colav/Oxomo",
-        scripts=['bin/oxomo_run'],
+        url="https://github.com/colav/Oxomoc",
+        scripts=['bin/oxomoc_run'],
         #
         license="BSD",
 
