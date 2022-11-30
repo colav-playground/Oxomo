@@ -6,7 +6,7 @@ import xmltodict
 import psutil
 
 
-class OxomoCheckPointSelective:
+class OxomocCheckPointSelective:
     """
     Class to handle checkpoints for Colav OAI-PMH using selective strategy by dates.
     """

@@ -1,5 +1,5 @@
-from oxomo.checkpoint import OxomoCheckPoint
-from oxomo.ckpselective import OxomoCheckPointSelective
+from oxomoc.checkpoint import OxomocCheckPoint
+from oxomoc.ckpselective import OxomocCheckPointSelective
 from pymongo import MongoClient
 from oaipmh.client import Client
 from joblib import Parallel, delayed
@@ -9,12 +9,12 @@ from ratelimit import limits, sleep_and_retry
 import sys
 
 
-class OxomoHarvester:
+class OxomocHarvester:
     """
     Class for harvesting data from OAI-PHM protocol
     """
 
-    def __init__(self, endpoints: dict, mongo_db="oxomo", mongodb_uri="mongodb://localhost:27017/", force_http_get=True):
+    def __init__(self, endpoints: dict, mongo_db="oxomoc", mongodb_uri="mongodb://localhost:27017/", force_http_get=True):
         """
         Harvester constructor
 
@@ -23,7 +23,7 @@ class OxomoHarvester:
         endpoints:dict
             dictionary with parameters for endpoints such as url, name, rate-limit, etc..
         mongo_db:str
-            MongoDB name, default value "oxomo"
+            MongoDB name, default value "oxomoc"
         mongodb_uri:str
             MongoDB connection string uri
         """
@@ -147,10 +147,10 @@ class OxomoHarvester:
         selective = self.endpoints[endpoint]["checkpoint"]["selective"]
         checkpoint = self.endpoints[endpoint]["checkpoint"]["enabled"]
         if selective:
-            self.checkpoint[endpoint] = OxomoCheckPointSelective(
+            self.checkpoint[endpoint] = OxomocCheckPointSelective(
                 self.mongodb_uri)
         else:
-            self.checkpoint[endpoint] = OxomoCheckPoint(self.mongodb_uri)
+            self.checkpoint[endpoint] = OxomocCheckPoint(self.mongodb_uri)
         if checkpoint:
             self.checkpoint[endpoint].create(
                 url, self.mongo_db, endpoint, metadataPrefix)
@@ -163,8 +163,8 @@ class OxomoHarvester:
             self.process_records(client, record_ids, metadataPrefix, endpoint)
         else:
             print(
-                f"*** Error: records checkpoint for {endpoint} not found, create it first with ...")
-            print(f"*** Omitting records {url} {endpoint}")
+                f"=== Error: records checkpoint for {endpoint} not found, create it first with ...")
+            print(f"=== Error: Skipping records from {url} in {endpoint}")
 
     def run(self, jobs: int = None):
         """
