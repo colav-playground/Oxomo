@@ -236,6 +236,7 @@ class OxomocCheckPointSelective:
         """
         pipeline = [
             {"$match": {}},
+            {"$project": { "_id":0, "identifiers":1} },
             {"$unwind": "$identifiers"},
             {"$match": {"$and": [{"identifiers.@status": {"$ne": "deleted"}},
                                  {"identifiers.downloaded": False}]}},
