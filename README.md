@@ -12,7 +12,7 @@ Supports:
 * Parallel execution, to download multiple repositories at the same time.
 * Rate-Limit to avoid DDoS and 429 errors, this is supported asynchronous in the parallel execution, which means that every repo can have a different rate limit.
 * Allows parse the XML as dictionary without losing information thanks to the package xmltodict, allowing at the same time, saving the records in MongoDB.
-* Command line tool oxomo_run.
+* Command line tool oxomoc_run.
 * CheckPoint to save the state of the execution. This feature is available suing to different algorithms, selective or not. Which means that we can create a checkpoint using (from/until) in the verb ListIdentifiers. This is because not all endpoints has support for this.
 
 # Installation
@@ -22,7 +22,7 @@ This package requires a MongoDB engine to save the results.
 Please read https://www.mongodb.com/docs/manual/administration/install-community/
 
 ## Package
-`pip install oxomo`
+`pip install oxomoc`
 
 # Usage
 
