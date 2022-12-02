@@ -71,7 +71,7 @@ class OxomocCheckPointSelective:
 
         delta = 60 * 60 * 24
         col_identifiers = self.client[mongo_db][f"{mongo_collection}_identifiers"]
-        ckp = col_identifiers.find_one({"_id": 0})
+        ckp = col_identifiers.find_one({}, sort=[('final_date', -1)])
         if ckp is not None:
             if "final_date" in ckp.keys():
                 init_date = ckp["final_date"]
@@ -79,7 +79,6 @@ class OxomocCheckPointSelective:
                 init_date = identity.earliestDatestamp()
         else:
             init_date = identity.earliestDatestamp()
-            col_identifiers.insert_one({"_id": 0, "initial_date": init_date})
         end_date = init_date + timedelta(days=days)
         end_date = end_date.replace(hour=0, minute=0, second=0)
         if end_date > datetime.today():
@@ -108,8 +107,8 @@ class OxomocCheckPointSelective:
                 if ids['OAI-PMH']["error"]['@code'] == 'noRecordsMatch':
                     # records not found in the period of time
                     # setting next time range
-                    col_identifiers.update_one(
-                        {"_id": 0}, {"$set": {"final_date": end_date}})
+                    col_identifiers.insert_one(
+                        {"_id": end_date, "initial_date": init_date, "final_date": end_date, "identifiers":[]})
                     init_date = end_date + timedelta(seconds=delta)
                     end_date = init_date + timedelta(days=days)
                     if end_date > datetime.today():
@@ -158,14 +157,11 @@ class OxomocCheckPointSelective:
                 for i in identifiers:
                     i["downloaded"] = False
             if len(identifiers) != 0:
-                col_identifiers.update_one({"_id": 0}, {"$set": {"final_date": end_date},
-                                                        '$push': {'identifiers': {'$each': identifiers},
-                                                                  'ranges': {"init_date": init_date,
-                                                                             'final_date': end_date, "n_records": total}}},
-                                           upsert=True)
+                col_identifiers.insert_one({"_id": end_date, "final_date": end_date, 'identifiers': identifiers, 'ranges': {
+                                           "init_date": init_date, 'final_date': end_date, "n_records": total}})
             else:
-                col_identifiers.update_one(
-                    {"_id": 0}, {"$set": {"final_date": end_date}})
+                col_identifiers.insert_one(
+                    {"_id": end_date, "init_date": init_date, "final_date": end_date, "identifiers":[]})
             init_date = end_date + timedelta(seconds=delta)
             end_date = init_date + timedelta(days=days)
             if end_date > datetime.today():
@@ -213,10 +209,10 @@ class OxomocCheckPointSelective:
         keys:dict
             Dictionary with _id and other required values to perform the update.
         """
-        self.client[mongo_db][f"{mongo_collection}_identifiers"].update_one({"_id": 0}, {"$set": {
-                                                                            "identifiers.$[idx].downloaded": True}},
-                                                                            upsert=True,
-                                                                            array_filters=[{'idx.identifier': keys["_id"]}])
+        self.client[mongo_db][f"{mongo_collection}_identifiers"].update_many({}, {"$set": {
+            "identifiers.$[idx].downloaded": True}},
+            upsert=True,
+            array_filters=[{'idx.identifier': keys["_id"]}])
 
     def get_records_regs(self, mongo_db: str, mongo_collection: str):
         """
@@ -236,10 +232,11 @@ class OxomocCheckPointSelective:
         """
         pipeline = [
             {"$match": {}},
+            {"$project": {"_id": 0, "identifiers": 1}},
             {"$unwind": "$identifiers"},
             {"$match": {"$and": [{"identifiers.@status": {"$ne": "deleted"}},
                                  {"identifiers.downloaded": False}]}},
-            {"$addFields": {"_id": "$identifiers.identifier"}},
+            {"$group": {"_id": "$identifiers.identifier"}},
             {"$project": {"_id": 1}},
         ]
         ckp_col = self.client[mongo_db][f"{mongo_collection}_identifiers"]
