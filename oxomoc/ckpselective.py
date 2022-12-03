@@ -22,11 +22,11 @@ class OxomocCheckPointSelective:
         """
         self.client = MongoClient(mongodb_uri)
 
-    def create(self, base_url: str, mongo_db: str, mongo_collection: str, metadataPrefix='oai_dc', force_http_get=True, days=30, max_tries=4):  # noqa: E501
+    def create(self, base_url: str, mongo_db: str, mongo_collection: str, metadataPrefix='oai_dc', force_http_get=True, days=10, max_tries=4):  # noqa: E501
         """
         Method to create the checkpoint, this allows to save all the ids for records and sets
         in order to know what was downloaded.
-        All the checkpints are saved in the mongo collections
+        All the checkpoints are saved in the mongo collections
 
         Parameters:
         ----------
@@ -40,6 +40,10 @@ class OxomocCheckPointSelective:
             metadata type for xml schema ex: dim, xoai, mods, oai_dc (default: oai_dc)
         force_http_get:bool
             force to use get instead post for requests
+        days:int
+            number of days for the selective checkpoint date range
+        max_tries:int
+            number of tries in case of failing the request
         """
         client = Client(base_url, force_http_get=force_http_get)
         try:
