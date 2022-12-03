@@ -146,14 +146,20 @@ class OxomocHarvester:
         metadataPrefix = self.endpoints[endpoint]["metadataPrefix"]
         selective = self.endpoints[endpoint]["checkpoint"]["selective"]
         checkpoint = self.endpoints[endpoint]["checkpoint"]["enabled"]
+
         if selective:
             self.checkpoint[endpoint] = OxomocCheckPointSelective(
                 self.mongodb_uri)
         else:
             self.checkpoint[endpoint] = OxomocCheckPoint(self.mongodb_uri)
         if checkpoint:
-            self.checkpoint[endpoint].create(
-                url, self.mongo_db, endpoint, metadataPrefix)
+            if selective:
+                days = self.endpoints[endpoint]["checkpoint"]["days"]
+                self.checkpoint[endpoint].create(
+                    url, self.mongo_db, endpoint, metadataPrefix,days)
+            else:
+                self.checkpoint[endpoint].create(
+                    url, self.mongo_db, endpoint, metadataPrefix)
 
         print(f"\n=== Processing {endpoint} from {url} ")
         if self.checkpoint[endpoint].exists_records(self.mongo_db, endpoint):
