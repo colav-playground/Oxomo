@@ -4,6 +4,7 @@ from pymongo import MongoClient
 from datetime import datetime, timedelta
 import xmltodict
 import psutil
+import sys
 
 
 class OxomocCheckPointSelective:
@@ -112,7 +113,7 @@ class OxomocCheckPointSelective:
                     # records not found in the period of time
                     # setting next time range
                     col_identifiers.insert_one(
-                        {"_id": end_date, "initial_date": init_date, "final_date": end_date, "identifiers":[]})
+                        {"_id": end_date, "initial_date": init_date, "final_date": end_date, "identifiers": []})
                     init_date = end_date + timedelta(seconds=delta)
                     end_date = init_date + timedelta(days=days)
                     if end_date > datetime.today():
@@ -123,6 +124,8 @@ class OxomocCheckPointSelective:
                           ['@code'], mongo_collection, base_url, params),
                     print(init_date, "----", end_date,
                           "ERROR creating checkpoint!!!", mongo_collection)
+                    self.client[mongo_db][f"{mongo_collection}_error"].insert_one(
+                        {"item_type": "checkpoint", "dict": ids, "msg": "OAI-PMH Error"})
                     break
             if ids['OAI-PMH']['ListIdentifiers'] is None:
                 pass
@@ -147,8 +150,16 @@ class OxomocCheckPointSelective:
                         params['resumptionToken'] = ids['OAI-PMH']['ListIdentifiers']['resumptionToken']['#text']
                     else:
                         break
-                    ids = client.makeRequest(**params)
-                    ids = xmltodict.parse(ids)
+                    _ids = client.makeRequest(**params)
+                    ids = xmltodict.parse(_ids)
+                    if not "header" in ids['OAI-PMH']['ListIdentifiers'].keys():
+                        print("=== ERROR:", _ids,
+                              mongo_collection, base_url, params),
+                        print(init_date, "----", end_date,
+                              "ERROR creating checkpoint!!!", mongo_collection)
+                        self.client[mongo_db][f"{mongo_collection}_error"].insert_one(
+                            {"item_type": "checkpoint", "dict": ids, "init_date": init_date, "end_date": end_date , "msg": "XML Error"})
+                        sys.exit(1)
                     _ids = ids['OAI-PMH']['ListIdentifiers']["header"]
                     # if there is only one register is returning a dict, instead list
                     if type(_ids) is not list:
@@ -165,7 +176,7 @@ class OxomocCheckPointSelective:
                                            "init_date": init_date, 'final_date': end_date, "n_records": total}})
             else:
                 col_identifiers.insert_one(
-                    {"_id": end_date, "init_date": init_date, "final_date": end_date, "identifiers":[]})
+                    {"_id": end_date, "init_date": init_date, "final_date": end_date, "identifiers": []})
             init_date = end_date + timedelta(seconds=delta)
             end_date = init_date + timedelta(days=days)
             if end_date > datetime.today():

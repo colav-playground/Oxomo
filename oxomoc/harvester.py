@@ -155,7 +155,6 @@ class OxomocHarvester:
         if checkpoint:
             if selective:
                 days = self.endpoints[endpoint]["checkpoint"]["days"]
-                print(days)
                 self.checkpoint[endpoint].create(
                     url, self.mongo_db, endpoint, metadataPrefix, True, days)
             else:
