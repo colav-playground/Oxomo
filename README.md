@@ -13,7 +13,7 @@ Supports:
 * Rate-Limit to avoid DDoS and 429 errors, this is supported asynchronous in the parallel execution, which means that every repo can have a different rate limit.
 * Allows parse the XML as dictionary without losing information thanks to the package xmltodict, allowing at the same time, saving the records in MongoDB.
 * Command line tool oxomoc_run.
-* CheckPoint to save the state of the execution. This feature is available suing to different algorithms, selective or not. Which means that we can create a checkpoint using (from/until) in the verb ListIdentifiers. This is because not all endpoints has support for this.
+* CheckPoint to save the state of the execution. This feature is available using different algorithms, selective or not. Which means that we can create a checkpoint using (from/until) in the verb ListIdentifiers. This is because not all endpoints have support for this.
 
 # Installation
 
