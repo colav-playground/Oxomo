@@ -48,7 +48,7 @@ endpoints["dspace_uext"]["checkpoint"]["days"] = 30
 # this is not working :C
 endpoints["dspace_unaula"] = {}
 endpoints["dspace_unaula"]["enabled"] = False
-endpoints["dspace_unaula"]["url"] = "http://repository.unaula.edu.co:8080/oai/request"
+endpoints["dspace_unaula"]["url"] = "http://repositorio.unaula.edu.co:8080/server/oai/request"
 endpoints["dspace_unaula"]["metadataPrefix"] = "dim"
 endpoints["dspace_unaula"]["rate_limit"] = {
     "calls": 1000, "secs": 1}  # calls per second
