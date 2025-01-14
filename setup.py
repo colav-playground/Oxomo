@@ -52,40 +52,32 @@ def main():
     setup(
         # Application name:
         name="Oxomoc",
-
         # Version number (initial):
-        version=get_version('oxomoc/_version.py'),
-
+        version=get_version("oxomoc/_version.py"),
         # Application author details:
         author="Colav",
         author_email="colav@udea.edu.co",
-
         # Packages
-        packages=find_packages(exclude=['tests']),
-
+        packages=find_packages(exclude=["tests"]),
         # Include additional files into the package
         include_package_data=True,
-
         # Details
         url="https://github.com/colav/Oxomoc",
-        scripts=['bin/oxomoc_run'],
+        scripts=["bin/oxomoc_run"],
         #
         license="BSD",
-
         description="Colav OAI-PMH Harvester",
-
         long_description=open("README.md").read(),
-
         long_description_content_type="text/markdown",
-
         # Dependent packages (distributions)
         install_requires=[
-            'xmltodict>=0.13.0',
-            'pyoai>=2.5.0',
-            'ratelimit>=2.2.1',
-            'psutil',
-            'pymongo>=3.12.0',
-            'joblib>=1.1.0'
+            "xmltodict>=0.13.0",
+            "pyoai>=2.5.0",
+            "ratelimit>=2.2.1",
+            "psutil",
+            "pymongo>=3.12.0",
+            "joblib>=1.1.0",
+            "lxml==4.9.3"
         ],
     )
 
