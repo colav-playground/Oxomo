@@ -5,6 +5,8 @@ import socket
 
 # import json
 import sys
+import urllib.request
+import ssl
 import argparse
 import importlib
 import faulthandler
@@ -83,6 +85,14 @@ if __name__ == '__main__':
 
     # set default timeout
     socket.setdefaulttimeout(timeout)
+
+    # Crear un contexto SSL sin verificar certificados (para pruebas)
+    ssl_context = ssl._create_unverified_context()
+
+    # Configurar un opener global con el contexto SSL
+    opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl_context))
+    urllib.request.install_opener(opener)
+
     if check_endpoints_config(endpoints) == False:
         print(
             f"ERROR: config file {config_file} error, fix the configuration to continue, please take a look in the README.md to get some help.")
