@@ -20,6 +20,8 @@ parser.add_argument('--config', type=str, required=True,
                     help='python file with a dictionary called endpoints, take a look in the README for more information.')
 parser.add_argument('--drop_mongodb', action='store_true',
                     help='delete the database, use it with carefull, deletes everything!')
+parser.add_argument('--verbose', action='store_true',
+                    help='shows more information about the execution')
 
 
 def check_endpoints_config(endpoints):
@@ -66,6 +68,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     max_threads = args.max_threads
     config_file = args.config
+    verbose = args.verbose
     # with open(config_file) as f:
     #    endpoints = json.load(f)
     loader = importlib.machinery.SourceFileLoader('config', config_file)
@@ -78,5 +81,5 @@ if __name__ == '__main__':
             f"ERROR: config file {config_file} error, fix the configuration to continue, please take a look in the README.md to get some help.")
         print(f"ERROR: aborting execution")
         sys.exit(1)
-    harvester = OxomocHarvester(endpoints, args.mongo_dbname, args.mongo_dburi)
+    harvester = OxomocHarvester(endpoints, args.mongo_dbname, args.mongo_dburi, verbose)
     harvester.run(max_threads)
