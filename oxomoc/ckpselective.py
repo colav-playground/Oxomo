@@ -142,7 +142,8 @@ class OxomocCheckPointSelective:
                     params = {}
                     params['verb'] = 'ListIdentifiers'
                     total = eval(ids['OAI-PMH']['ListIdentifiers']['resumptionToken']
-                                 ['@completeListSize'])  # this is int for dspace
+                                 # this is int for dspace
+                                 ['@completeListSize'])
                     if type(total) is not int:
                         # this is for zenodo, maybe other implementations?
                         total = total["value"]
@@ -158,7 +159,7 @@ class OxomocCheckPointSelective:
                         print(init_date, "----", end_date,
                               "ERROR creating checkpoint!!!", mongo_collection)
                         self.client[mongo_db][f"{mongo_collection}_error"].insert_one(
-                            {"item_type": "checkpoint", "dict": ids, "init_date": init_date, "end_date": end_date , "msg": "XML Error"})
+                            {"item_type": "checkpoint", "dict": ids, "init_date": init_date, "end_date": end_date, "msg": "XML Error"})
                         sys.exit(1)
                     _ids = ids['OAI-PMH']['ListIdentifiers']["header"]
                     # if there is only one register is returning a dict, instead list

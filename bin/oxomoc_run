@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 from oxomoc.checkpoint import OxomocCheckPoint
 from oxomoc.harvester import OxomocHarvester
+import socket
 
-#import json
+# import json
 import sys
+import urllib.request
+import ssl
 import argparse
 import importlib
 import faulthandler
@@ -20,6 +23,10 @@ parser.add_argument('--config', type=str, required=True,
                     help='python file with a dictionary called endpoints, take a look in the README for more information.')
 parser.add_argument('--drop_mongodb', action='store_true',
                     help='delete the database, use it with carefull, deletes everything!')
+parser.add_argument('--verbose', action='store_true',
+                    help='shows more information about the execution')
+parser.add_argument(
+    "--timeout", type=int, default=240, help="Timeout for the requests in seconds (default 240)")
 
 
 def check_endpoints_config(endpoints):
@@ -66,6 +73,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     max_threads = args.max_threads
     config_file = args.config
+    verbose = args.verbose
+    timeout = args.timeout
     # with open(config_file) as f:
     #    endpoints = json.load(f)
     loader = importlib.machinery.SourceFileLoader('config', config_file)
@@ -73,10 +82,21 @@ if __name__ == '__main__':
     config = importlib.util.module_from_spec(spec)
     loader.exec_module(config)
     endpoints = config.endpoints
+
+    # set default timeout
+    socket.setdefaulttimeout(timeout)
+
+    # Crear un contexto SSL sin verificar certificados (para pruebas)
+    ssl_context = ssl._create_unverified_context()
+
+    # Configurar un opener global con el contexto SSL
+    opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl_context))
+    urllib.request.install_opener(opener)
+
     if check_endpoints_config(endpoints) == False:
         print(
             f"ERROR: config file {config_file} error, fix the configuration to continue, please take a look in the README.md to get some help.")
         print(f"ERROR: aborting execution")
         sys.exit(1)
-    harvester = OxomocHarvester(endpoints, args.mongo_dbname, args.mongo_dburi)
+    harvester = OxomocHarvester(endpoints, args.mongo_dbname, args.mongo_dburi, verbose)
     harvester.run(max_threads)

@@ -7,6 +7,7 @@ import psutil
 import xmltodict
 from ratelimit import limits, sleep_and_retry
 import sys
+import traceback
 
 
 class OxomocHarvester:
@@ -14,7 +15,7 @@ class OxomocHarvester:
     Class for harvesting data from OAI-PHM protocol
     """
 
-    def __init__(self, endpoints: dict, mongo_db="oxomoc", mongodb_uri="mongodb://localhost:27017/", force_http_get=True):
+    def __init__(self, endpoints: dict, mongo_db="oxomoc", mongodb_uri="mongodb://localhost:27017/", force_http_get=True, verbose=0):
         """
         Harvester constructor
 
@@ -32,6 +33,7 @@ class OxomocHarvester:
         self.mongodb_uri = mongodb_uri
         self.client = MongoClient(mongodb_uri)
         self.force_http_get = force_http_get
+        self.verbose = verbose
         self.check_limit = {}
         self.checkpoint = {}
         for endpoint in self.endpoints.keys():
@@ -79,9 +81,10 @@ class OxomocHarvester:
             self.client[self.mongo_db][f"{endpoint}_errors"].insert_one(record)
             self.checkpoint[endpoint].update_record(
                 self.mongo_db, endpoint, keys={"_id": identifier})
-            print("=== ERROR ===")
-            print(e)
-            print(identifier)
+            if self.verbose > 0:
+                print("=== ERROR ===")
+                print(e)
+                print(identifier)
             return
 
         record = xmltodict.parse(raw_record)
@@ -96,11 +99,14 @@ class OxomocHarvester:
             self.checkpoint[endpoint].update_record(
                 self.mongo_db, endpoint, keys={"_id": identifier})
         except Exception as e:
-            print("=== ERROR: ", e, endpoint, file=sys.stderr)
+            if self.verbose > 0:
+                print("=== ERROR: ", e, endpoint, file=sys.stderr)
         # performing "atomic" operation here(to be sure it was inserted)
         finally:
-            rcount = self.client[self.mongo_db][f"{endpoint}_records"].count_documents({"_id": identifier})
-            icount = self.client[self.mongo_db][f"{endpoint}_invalid"].count_documents({"_id": identifier})
+            rcount = self.client[self.mongo_db][f"{endpoint}_records"].count_documents({
+                                                                                       "_id": identifier})
+            icount = self.client[self.mongo_db][f"{endpoint}_invalid"].count_documents({
+                                                                                       "_id": identifier})
             if rcount != 0 or icount != 0:
                 self.checkpoint[endpoint].update_record(
                     self.mongo_db, endpoint, keys={"_id": identifier})
@@ -142,35 +148,40 @@ class OxomocHarvester:
         checkpoint:bool
             Bool to enable checkpointing
         """
-        url = self.endpoints[endpoint]["url"]
-        metadataPrefix = self.endpoints[endpoint]["metadataPrefix"]
-        selective = self.endpoints[endpoint]["checkpoint"]["selective"]
-        checkpoint = self.endpoints[endpoint]["checkpoint"]["enabled"]
+        try:
+            url = self.endpoints[endpoint]["url"]
+            metadataPrefix = self.endpoints[endpoint]["metadataPrefix"]
+            selective = self.endpoints[endpoint]["checkpoint"]["selective"]
+            checkpoint = self.endpoints[endpoint]["checkpoint"]["enabled"]
 
-        if selective:
-            self.checkpoint[endpoint] = OxomocCheckPointSelective(
-                self.mongodb_uri)
-        else:
-            self.checkpoint[endpoint] = OxomocCheckPoint(self.mongodb_uri)
-        if checkpoint:
             if selective:
-                days = self.endpoints[endpoint]["checkpoint"]["days"]
-                self.checkpoint[endpoint].create(
-                    url, self.mongo_db, endpoint, metadataPrefix, True, days)
+                self.checkpoint[endpoint] = OxomocCheckPointSelective(
+                    self.mongodb_uri)
             else:
-                self.checkpoint[endpoint].create(
-                    url, self.mongo_db, endpoint, metadataPrefix)
+                self.checkpoint[endpoint] = OxomocCheckPoint(self.mongodb_uri)
+            if checkpoint:
+                if selective:
+                    days = self.endpoints[endpoint]["checkpoint"]["days"]
+                    self.checkpoint[endpoint].create(
+                        url, self.mongo_db, endpoint, metadataPrefix, True, days)
+                else:
+                    self.checkpoint[endpoint].create(
+                        url, self.mongo_db, endpoint, metadataPrefix)
 
-        print(f"\n=== Processing {endpoint} from {url} ")
-        if self.checkpoint[endpoint].exists_records(self.mongo_db, endpoint):
-            client = Client(url, force_http_get=self.force_http_get)
-            record_ids = self.checkpoint[endpoint].get_records_regs(
-                self.mongo_db, endpoint)
-            self.process_records(client, record_ids, metadataPrefix, endpoint)
-        else:
-            print(
-                f"=== Error: records checkpoint for {endpoint} not found, create it first with ...")
-            print(f"=== Error: Skipping records from {url} in {endpoint}")
+            print(f"\n=== Processing {endpoint} from {url} ")
+            if self.checkpoint[endpoint].exists_records(self.mongo_db, endpoint):
+                client = Client(url, force_http_get=self.force_http_get)
+                record_ids = self.checkpoint[endpoint].get_records_regs(
+                    self.mongo_db, endpoint)
+                self.process_records(client, record_ids,
+                                     metadataPrefix, endpoint)
+            else:
+                print(
+                    f"=== Error: records checkpoint for {endpoint} not found, create it first with ...")
+                print(f"=== Error: Skipping records from {url} in {endpoint}")
+        except Exception as e:
+            print(f"=== ERROR: {e} {endpoint}", file=sys.stderr)
+            traceback.print_exc()
 
     def run(self, jobs: int = None):
         """
